@@ -4,7 +4,8 @@ Machine Learning project for predicting infrastructure failures
 
 This project implements an applied machine learning system to predict failures in critical infrastructure systems such as bridges and water pipelines. The primary goal is to build an early warning system that helps authorities move from reactive maintenance to predictive maintenance.
 
-Open in Colab
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1wKwQudpaVrTSfYcyuc2XujN4qWkVjw86?usp=sharing)
+
 
 ---
 
