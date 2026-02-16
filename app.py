@@ -2,14 +2,11 @@ import streamlit as st
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 
-# Page settings
 st.set_page_config(page_title="Infrastructure Early Warning System", layout="wide")
 
-# Title
 st.title("🏗️ Infrastructure Early Warning System")
 st.markdown(
-    "This application predicts failure risks in bridges and water pipelines "
-    "using Machine Learning to support **preventive maintenance**."
+    "Predict failure risks in bridges and water pipelines using **Machine Learning**."
 )
 
 # -------------------------
@@ -17,6 +14,14 @@ st.markdown(
 # -------------------------
 bridge = pd.read_csv("bridge.csv")
 water = pd.read_csv("water.csv")
+
+# -------------------------
+# Encode bridge dataset
+# -------------------------
+bridge["material"] = bridge["material"].map({"Concrete": 0, "Steel": 1})
+bridge["maintenance"] = bridge["maintenance"].map(
+    {"No-Maintenance": 0, "Bi-Annual": 1, "Annual": 2}
+)
 
 # -------------------------
 # Prepare Bridge model
@@ -54,7 +59,6 @@ with col2:
         "Maintenance Level", ["No-Maintenance", "Bi-Annual", "Annual"]
     )
 
-# Encode inputs
 material_val = 0 if material == "Concrete" else 1
 maintenance_map = {"No-Maintenance": 0, "Bi-Annual": 1, "Annual": 2}
 maintenance_val = maintenance_map[maintenance]
@@ -100,4 +104,3 @@ if st.button("Predict Water Risk"):
         st.error("High Failure Risk")
     else:
         st.success("Low Failure Risk")
-
