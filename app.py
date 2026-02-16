@@ -43,8 +43,9 @@ y_bridge = bridge["failure"]
 bridge_model = RandomForestClassifier()
 bridge_model.fit(X_bridge, y_bridge)
 
-# Prepare water model
-X_water = water.drop(["failure", "infrastructure_type"], axis=1)
+# Prepare Water model
+water = water.select_dtypes(include=["number"])  # keep only numeric columns
+X_water = water.drop("failure", axis=1)
 y_water = water["failure"]
 
 water_model = RandomForestClassifier()
@@ -126,3 +127,4 @@ else:
             st.error("⚠️ High Pipeline Failure Risk")
         else:
             st.success("✅ Low Failure Risk")
+
