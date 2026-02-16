@@ -2,9 +2,12 @@ import streamlit as st
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 
+# -----------------------------
+# Page config
+# -----------------------------
 st.set_page_config(page_title="Infrastructure Early Warning System", layout="wide")
 
-st.title("🏗 Infrastructure Early Warning System")
+st.title("🏗️ Infrastructure Early Warning System")
 st.markdown(
     "Predict failure risks in bridges and water pipelines using **Machine Learning**."
 )
@@ -16,6 +19,12 @@ bridge = pd.read_csv("bridge.csv")
 water = pd.read_csv("water.csv")
 
 # -----------------------------
+# Clean column names
+# -----------------------------
+bridge.columns = bridge.columns.str.strip()
+water.columns = water.columns.str.strip()
+
+# -----------------------------
 # Encode bridge dataset
 # -----------------------------
 bridge["Material_Type"] = bridge["Material_Type"].map({"Concrete": 0, "Steel": 1})
@@ -23,19 +32,22 @@ bridge["Maintenance_Level"] = bridge["Maintenance_Level"].map(
     {"No-Maintenance": 0, "Bi-Annual": 1, "Annual": 2}
 )
 
-# -----------------------------
-# Prepare Bridge model
-# -----------------------------
-X_bridge = bridge.drop(["failure", "infrastructure_type"], axis=1)
+# Drop non-numeric column
+X_bridge = bridge[
+    ["Age_of_Bridge", "Traffic_Volume", "Material_Type", "Maintenance_Level"]
+]
 y_bridge = bridge["failure"]
 
 bridge_model = RandomForestClassifier()
 bridge_model.fit(X_bridge, y_bridge)
 
 # -----------------------------
-# Prepare Water model
+# Prepare water dataset
+# Use only numeric columns
 # -----------------------------
-X_water = water.drop(["failure", "infrastructure_type"], axis=1)
+X_water = water[
+    ["Pressure (bar)", "Flow Rate (L/s)", "Temperature (°C)", "Burst Status"]
+]
 y_water = water["failure"]
 
 water_model = RandomForestClassifier()
@@ -48,54 +60,49 @@ st.markdown("---")
 
 col1, col2 = st.columns(2)
 
-# -----------------------------
-# Bridge Section
-# -----------------------------
+# =============================
+# Bridge Prediction Section
+# =============================
 with col1:
     st.subheader("Bridge Failure Prediction")
 
-    age = st.number_input("Bridge Age", 0, 200, 50)
-    traffic = st.number_input("Traffic Volume", 0, 10000, 2000)
+    age = st.slider("Bridge Age (years)", 1, 100, 50)
+    traffic = st.slider("Traffic Volume", 100, 5000, 2000)
+
     material = st.selectbox("Material Type", ["Concrete", "Steel"])
     maintenance = st.selectbox(
         "Maintenance Level", ["No-Maintenance", "Bi-Annual", "Annual"]
     )
 
-    material_val = 0 if material == "Concrete" else 1
-    maintenance_map = {"No-Maintenance": 0, "Bi-Annual": 1, "Annual": 2}
-    maintenance_val = maintenance_map[maintenance]
-
     if st.button("Predict Bridge Risk"):
-        sample = pd.DataFrame(
-            [[age, traffic, material_val, maintenance_val]],
-            columns=X_bridge.columns,
-        )
-        prediction = bridge_model.predict(sample)[0]
+        material_val = 0 if material == "Concrete" else 1
+        maintenance_map = {"No-Maintenance": 0, "Bi-Annual": 1, "Annual": 2}
+        maintenance_val = maintenance_map[maintenance]
 
-        if prediction == 1:
-            st.error("⚠ High Failure Risk")
+        pred = bridge_model.predict(
+            [[age, traffic, material_val, maintenance_val]]
+        )[0]
+
+        if pred == 1:
+            st.error("⚠️ High Failure Risk Detected")
         else:
-            st.success("✔ Low Failure Risk")
+            st.success("✅ Bridge is Safe")
 
-# -----------------------------
-# Water Section
-# -----------------------------
+# =============================
+# Water Prediction Section
+# =============================
 with col2:
     st.subheader("Water Pipeline Failure Prediction")
 
-    pressure = st.number_input("Pressure (bar)", 0.0, 10.0, 3.5)
-    flow = st.number_input("Flow Rate (L/s)", 0.0, 500.0, 180.0)
-    temperature = st.number_input("Temperature (°C)", 0.0, 100.0, 25.0)
+    pressure = st.slider("Pressure (bar)", 1, 20, 8)
+    flow = st.slider("Flow Rate (L/s)", 10, 200, 80)
+    temp = st.slider("Temperature (°C)", 0, 60, 25)
     burst = st.selectbox("Burst Status", [0, 1])
 
-    if st.button("Predict Water Risk"):
-        sample = pd.DataFrame(
-            [[pressure, flow, temperature, burst]],
-            columns=X_water.columns,
-        )
-        prediction = water_model.predict(sample)[0]
+    if st.button("Predict Pipeline Risk"):
+        pred = water_model.predict([[pressure, flow, temp, burst]])[0]
 
-        if prediction == 1:
-            st.error("⚠ High Failure Risk")
+        if pred == 1:
+            st.error("⚠️ High Failure Risk Detected")
         else:
-            st.success("✔ Low Failure Risk")
+            st.success("✅ Pipeline is Safe")
