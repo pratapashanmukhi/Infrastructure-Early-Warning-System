@@ -1,108 +1,160 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 from sklearn.ensemble import RandomForestClassifier
+import plotly.express as px
 
-# -----------------------------
-# Page config
-# -----------------------------
-st.set_page_config(page_title="Infrastructure Early Warning System", layout="wide")
+st.set_page_config(page_title="Infrastructure Early Warning", layout="wide")
 
-st.title("🏗️ Infrastructure Early Warning System")
-st.markdown(
-    "Predict failure risks in bridges and water pipelines using **Machine Learning**."
-)
+# --------------------------
+# Simple Login System
+# --------------------------
+def login():
+    st.title("🔐 Login")
 
-# -----------------------------
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+        if username == "admin" and password == "1234":
+            st.session_state["logged_in"] = True
+        else:
+            st.error("Invalid credentials")
+
+if "logged_in" not in st.session_state:
+    st.session_state["logged_in"] = False
+
+if not st.session_state["logged_in"]:
+    login()
+    st.stop()
+
+# --------------------------
 # Load datasets
-# -----------------------------
+# --------------------------
 bridge = pd.read_csv("bridge.csv")
 water = pd.read_csv("water.csv")
 
-# -----------------------------
-# Clean column names
-# -----------------------------
-bridge.columns = bridge.columns.str.strip()
-water.columns = water.columns.str.strip()
-
-# -----------------------------
-# Encode bridge dataset
-# -----------------------------
+# Encode bridge
 bridge["Material_Type"] = bridge["Material_Type"].map({"Concrete": 0, "Steel": 1})
-bridge["Maintenance_Level"] = bridge["Maintenance_Level"].map(
-    {"No-Maintenance": 0, "Bi-Annual": 1, "Annual": 2}
-)
+bridge["Maintenance_Level"] = bridge["Maintenance_Level"].map({
+    "No-Maintenance": 0,
+    "Bi-Annual": 1,
+    "Annual": 2
+})
 
-# Drop non-numeric column
-X_bridge = bridge[
-    ["Age_of_Bridge", "Traffic_Volume", "Material_Type", "Maintenance_Level"]
-]
+# Encode water (if needed)
+if "Burst_Status" in water.columns:
+    water["Burst_Status"] = water["Burst_Status"].astype(int)
+
+# --------------------------
+# Train models
+# --------------------------
+X_bridge = bridge.drop(columns=["failure", "infrastructure_type"])
 y_bridge = bridge["failure"]
-
 bridge_model = RandomForestClassifier()
 bridge_model.fit(X_bridge, y_bridge)
 
-# -----------------------------
-# Prepare water dataset
-# Use only numeric columns
-# -----------------------------
-X_water = water[
-    ["Pressure (bar)", "Flow Rate (L/s)", "Temperature (°C)", "Burst Status"]
-]
+X_water = water.drop(columns=["failure", "infrastructure_type"])
 y_water = water["failure"]
-
 water_model = RandomForestClassifier()
 water_model.fit(X_water, y_water)
 
-# -----------------------------
-# UI Layout
-# -----------------------------
-st.markdown("---")
+# --------------------------
+# UI
+# --------------------------
+st.title("🏗 Infrastructure Early Warning System")
+st.markdown("Predict failure risks using Machine Learning")
 
-col1, col2 = st.columns(2)
+tab1, tab2, tab3 = st.tabs(["Prediction", "Analytics", "Map Monitoring"])
 
-# =============================
-# Bridge Prediction Section
-# =============================
-with col1:
-    st.subheader("Bridge Failure Prediction")
+# --------------------------
+# TAB 1: Prediction
+# --------------------------
+with tab1:
+    col1, col2 = st.columns(2)
 
-    age = st.slider("Bridge Age (years)", 1, 100, 50)
-    traffic = st.slider("Traffic Volume", 100, 5000, 2000)
+    # Bridge
+    with col1:
+        st.subheader("Bridge Failure Prediction")
 
-    material = st.selectbox("Material Type", ["Concrete", "Steel"])
-    maintenance = st.selectbox(
-        "Maintenance Level", ["No-Maintenance", "Bi-Annual", "Annual"]
-    )
+        age = st.slider("Bridge Age", 0, 100, 40)
+        traffic = st.slider("Traffic Volume", 0, 5000, 2000)
+        material = st.selectbox("Material Type", ["Concrete", "Steel"])
+        maintenance = st.selectbox("Maintenance Level",
+                                   ["No-Maintenance", "Bi-Annual", "Annual"])
 
-    if st.button("Predict Bridge Risk"):
-        material_val = 0 if material == "Concrete" else 1
-        maintenance_map = {"No-Maintenance": 0, "Bi-Annual": 1, "Annual": 2}
-        maintenance_val = maintenance_map[maintenance]
+        if st.button("Predict Bridge Risk"):
+            material_val = 0 if material == "Concrete" else 1
+            maintenance_map = {"No-Maintenance": 0, "Bi-Annual": 1, "Annual": 2}
+            maintenance_val = maintenance_map[maintenance]
 
-        pred = bridge_model.predict(
-            [[age, traffic, material_val, maintenance_val]]
-        )[0]
+            input_data = [[age, traffic, material_val, maintenance_val]]
+            prob = bridge_model.predict_proba(input_data)[0][1]
+            risk = prob * 100
 
-        if pred == 1:
-            st.error("⚠️ High Failure Risk Detected")
-        else:
-            st.success("✅ Bridge is Safe")
+            st.metric("Risk Percentage", f"{risk:.2f}%")
 
-# =============================
-# Water Prediction Section
-# =============================
-with col2:
-    st.subheader("Water Pipeline Failure Prediction")
+            if risk > 60:
+                st.error("High Failure Risk")
+            else:
+                st.success("Low Failure Risk")
 
-    pressure = st.slider("Pressure (bar)", 1, 20, 8)
-    flow = st.slider("Flow Rate (L/s)", 10, 200, 80)
-    temp = st.slider("Temperature (°C)", 0, 60, 25)
-    burst = st.selectbox("Burst Status", [0, 1])
+    # Water
+    with col2:
+        st.subheader("Water Pipeline Failure Prediction")
 
-    if st.button("Predict Pipeline Risk"):
-        pred = water_model.predict([[pressure, flow, temp, burst]])[0]
+        pressure = st.slider("Pressure", 0, 10, 5)
+        flow = st.slider("Flow Rate", 0, 200, 100)
+        temp = st.slider("Temperature", 0, 100, 25)
+        burst = st.selectbox("Burst Status", [0, 1])
 
-        if pred == 1:
-            st.error("⚠️ High Failure Risk Detected")
-        else:
-            st.success("✅ Pipeline is Safe")
+        if st.button("Predict Pipeline Risk"):
+            input_data = [[pressure, flow, temp, burst]]
+            prob = water_model.predict_proba(input_data)[0][1]
+            risk = prob * 100
+
+            st.metric("Risk Percentage", f"{risk:.2f}%")
+
+            if risk > 60:
+                st.error("High Failure Risk")
+            else:
+                st.success("Low Failure Risk")
+
+# --------------------------
+# TAB 2: Analytics Dashboard
+# --------------------------
+with tab2:
+    st.subheader("Infrastructure Analytics")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        fig1 = px.histogram(bridge, x="Age_of_Bridge",
+                            title="Bridge Age Distribution")
+        st.plotly_chart(fig1, use_container_width=True)
+
+    with col2:
+        fig2 = px.histogram(water, x="Pressure",
+                            title="Water Pressure Distribution")
+        st.plotly_chart(fig2, use_container_width=True)
+
+    fig3 = px.scatter(bridge,
+                      x="Age_of_Bridge",
+                      y="Traffic_Volume",
+                      color="failure",
+                      title="Bridge Risk Scatter")
+    st.plotly_chart(fig3, use_container_width=True)
+
+# --------------------------
+# TAB 3: Map Monitoring
+# --------------------------
+with tab3:
+    st.subheader("Live Infrastructure Map")
+
+    # Create dummy map data
+    map_data = pd.DataFrame({
+        "lat": np.random.uniform(17.0, 18.0, 50),
+        "lon": np.random.uniform(78.0, 79.0, 50)
+    })
+
+    st.map(map_data)
