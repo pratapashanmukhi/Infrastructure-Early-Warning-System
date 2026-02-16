@@ -1,160 +1,183 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
+import sqlite3
+import hashlib
 from sklearn.ensemble import RandomForestClassifier
-import plotly.express as px
 
-st.set_page_config(page_title="Infrastructure Early Warning", layout="wide")
+# -------------------------------
+# Page config
+# -------------------------------
+st.set_page_config(page_title="Infrastructure Early Warning System", layout="wide")
 
-# --------------------------
-# Simple Login System
-# --------------------------
-def login():
-    st.title("🔐 Login")
+# -------------------------------
+# Database setup
+# -------------------------------
+conn = sqlite3.connect("users.db", check_same_thread=False)
+c = conn.cursor()
 
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+c.execute("""
+CREATE TABLE IF NOT EXISTS users(
+    username TEXT PRIMARY KEY,
+    password TEXT
+)
+""")
+conn.commit()
 
-    if st.button("Login"):
-        if username == "admin" and password == "1234":
-            st.session_state["logged_in"] = True
-        else:
-            st.error("Invalid credentials")
+# -------------------------------
+# Password hashing
+# -------------------------------
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
 
+# -------------------------------
+# Auth functions
+# -------------------------------
+def create_user(username, password):
+    try:
+        c.execute("INSERT INTO users VALUES (?, ?)", (username, hash_password(password)))
+        conn.commit()
+        return True
+    except:
+        return False
+
+def login_user(username, password):
+    c.execute("SELECT * FROM users WHERE username=? AND password=?", 
+              (username, hash_password(password)))
+    return c.fetchone()
+
+# -------------------------------
+# Session state
+# -------------------------------
 if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
+    st.session_state.logged_in = False
+if "username" not in st.session_state:
+    st.session_state.username = ""
 
-if not st.session_state["logged_in"]:
-    login()
-    st.stop()
+# -------------------------------
+# Login / Signup UI
+# -------------------------------
+def login_signup():
+    st.title("🔐 User Authentication")
 
-# --------------------------
-# Load datasets
-# --------------------------
-bridge = pd.read_csv("bridge.csv")
-water = pd.read_csv("water.csv")
+    tab1, tab2 = st.tabs(["Login", "Sign Up"])
 
-# Encode bridge
-bridge["Material_Type"] = bridge["Material_Type"].map({"Concrete": 0, "Steel": 1})
-bridge["Maintenance_Level"] = bridge["Maintenance_Level"].map({
-    "No-Maintenance": 0,
-    "Bi-Annual": 1,
-    "Annual": 2
-})
+    # LOGIN
+    with tab1:
+        st.subheader("Login")
+        username = st.text_input("Username", key="login_user")
+        password = st.text_input("Password", type="password", key="login_pass")
 
-# Encode water (if needed)
-if "Burst_Status" in water.columns:
-    water["Burst_Status"] = water["Burst_Status"].astype(int)
+        if st.button("Login"):
+            result = login_user(username, password)
+            if result:
+                st.session_state.logged_in = True
+                st.session_state.username = username
+                st.success("Login successful!")
+                st.rerun()
+            else:
+                st.error("Invalid credentials")
 
-# --------------------------
-# Train models
-# --------------------------
-X_bridge = bridge.drop(columns=["failure", "infrastructure_type"])
-y_bridge = bridge["failure"]
-bridge_model = RandomForestClassifier()
-bridge_model.fit(X_bridge, y_bridge)
+    # SIGNUP
+    with tab2:
+        st.subheader("Create New Account")
+        new_user = st.text_input("New Username")
+        new_pass = st.text_input("New Password", type="password")
 
-X_water = water.drop(columns=["failure", "infrastructure_type"])
-y_water = water["failure"]
-water_model = RandomForestClassifier()
-water_model.fit(X_water, y_water)
+        if st.button("Sign Up"):
+            if create_user(new_user, new_pass):
+                st.success("Account created! You can now log in.")
+            else:
+                st.error("Username already exists")
 
-# --------------------------
-# UI
-# --------------------------
-st.title("🏗 Infrastructure Early Warning System")
-st.markdown("Predict failure risks using Machine Learning")
+# -------------------------------
+# Main Dashboard
+# -------------------------------
+def dashboard():
+    st.title("🏗 Infrastructure Early Warning System")
+    st.write(f"Welcome, **{st.session_state.username}**")
 
-tab1, tab2, tab3 = st.tabs(["Prediction", "Analytics", "Map Monitoring"])
+    if st.button("Logout"):
+        st.session_state.logged_in = False
+        st.rerun()
 
-# --------------------------
-# TAB 1: Prediction
-# --------------------------
-with tab1:
+    st.divider()
+
+    # Load datasets
+    bridge = pd.read_csv("bridge.csv")
+    water = pd.read_csv("water.csv")
+
+    # Encode bridge data
+    bridge["Material_Type"] = bridge["Material_Type"].map({"Concrete": 0, "Steel": 1})
+    bridge["Maintenance_Level"] = bridge["Maintenance_Level"].map(
+        {"No-Maintenance": 0, "Bi-Annual": 1, "Annual": 2}
+    )
+
+    X_bridge = bridge.drop(["failure", "infrastructure_type"], axis=1)
+    y_bridge = bridge["failure"]
+
+    bridge_model = RandomForestClassifier()
+    bridge_model.fit(X_bridge, y_bridge)
+
+    # Prepare water model
+    X_water = water.drop(["failure", "infrastructure_type"], axis=1)
+    y_water = water["failure"]
+
+    water_model = RandomForestClassifier()
+    water_model.fit(X_water, y_water)
+
+    # Layout
     col1, col2 = st.columns(2)
 
-    # Bridge
+    # ---------------- Bridge Section ----------------
     with col1:
         st.subheader("Bridge Failure Prediction")
 
-        age = st.slider("Bridge Age", 0, 100, 40)
-        traffic = st.slider("Traffic Volume", 0, 5000, 2000)
+        age = st.slider("Bridge Age (years)", 1, 100, 50)
+        traffic = st.slider("Traffic Volume", 100, 5000, 2000)
+
         material = st.selectbox("Material Type", ["Concrete", "Steel"])
         maintenance = st.selectbox("Maintenance Level",
                                    ["No-Maintenance", "Bi-Annual", "Annual"])
 
+        material_val = 0 if material == "Concrete" else 1
+        maintenance_map = {"No-Maintenance": 0, "Bi-Annual": 1, "Annual": 2}
+        maintenance_val = maintenance_map[maintenance]
+
         if st.button("Predict Bridge Risk"):
-            material_val = 0 if material == "Concrete" else 1
-            maintenance_map = {"No-Maintenance": 0, "Bi-Annual": 1, "Annual": 2}
-            maintenance_val = maintenance_map[maintenance]
+            pred = bridge_model.predict([[age, traffic, material_val, maintenance_val]])[0]
+            prob = bridge_model.predict_proba([[age, traffic, material_val, maintenance_val]])[0][1]
 
-            input_data = [[age, traffic, material_val, maintenance_val]]
-            prob = bridge_model.predict_proba(input_data)[0][1]
-            risk = prob * 100
+            st.metric("Risk Probability", f"{prob*100:.2f}%")
 
-            st.metric("Risk Percentage", f"{risk:.2f}%")
-
-            if risk > 60:
-                st.error("High Failure Risk")
+            if pred == 1:
+                st.error("High Risk of Failure")
             else:
-                st.success("Low Failure Risk")
+                st.success("Low Risk")
 
-    # Water
+    # ---------------- Water Section ----------------
     with col2:
         st.subheader("Water Pipeline Failure Prediction")
 
-        pressure = st.slider("Pressure", 0, 10, 5)
-        flow = st.slider("Flow Rate", 0, 200, 100)
-        temp = st.slider("Temperature", 0, 100, 25)
+        pressure = st.slider("Pressure (bar)", 1, 15, 8)
+        flow = st.slider("Flow Rate (L/s)", 10, 200, 80)
+        temp = st.slider("Temperature (°C)", 0, 60, 25)
         burst = st.selectbox("Burst Status", [0, 1])
 
         if st.button("Predict Pipeline Risk"):
-            input_data = [[pressure, flow, temp, burst]]
-            prob = water_model.predict_proba(input_data)[0][1]
-            risk = prob * 100
+            pred = water_model.predict([[pressure, flow, temp, burst]])[0]
+            prob = water_model.predict_proba([[pressure, flow, temp, burst]])[0][1]
 
-            st.metric("Risk Percentage", f"{risk:.2f}%")
+            st.metric("Risk Probability", f"{prob*100:.2f}%")
 
-            if risk > 60:
-                st.error("High Failure Risk")
+            if pred == 1:
+                st.error("High Risk of Failure")
             else:
-                st.success("Low Failure Risk")
+                st.success("Low Risk")
 
-# --------------------------
-# TAB 2: Analytics Dashboard
-# --------------------------
-with tab2:
-    st.subheader("Infrastructure Analytics")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        fig1 = px.histogram(bridge, x="Age_of_Bridge",
-                            title="Bridge Age Distribution")
-        st.plotly_chart(fig1, use_container_width=True)
-
-    with col2:
-        fig2 = px.histogram(water, x="Pressure",
-                            title="Water Pressure Distribution")
-        st.plotly_chart(fig2, use_container_width=True)
-
-    fig3 = px.scatter(bridge,
-                      x="Age_of_Bridge",
-                      y="Traffic_Volume",
-                      color="failure",
-                      title="Bridge Risk Scatter")
-    st.plotly_chart(fig3, use_container_width=True)
-
-# --------------------------
-# TAB 3: Map Monitoring
-# --------------------------
-with tab3:
-    st.subheader("Live Infrastructure Map")
-
-    # Create dummy map data
-    map_data = pd.DataFrame({
-        "lat": np.random.uniform(17.0, 18.0, 50),
-        "lon": np.random.uniform(78.0, 79.0, 50)
-    })
-
-    st.map(map_data)
+# -------------------------------
+# App Flow
+# -------------------------------
+if not st.session_state.logged_in:
+    login_signup()
+else:
+    dashboard()
