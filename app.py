@@ -40,7 +40,7 @@ bridge_model.fit(X_bridge, y_bridge)
 # keep only numeric columns + target
 #for col in water.columns:
   #  if col not in ["failure", "infrastructure_type"]:
-        water[col] = pd.to_numeric(water[col], errors="coerce")
+      #  water[col] = pd.to_numeric(water[col], errors="coerce")
 
 #water = water.dropna()
 
@@ -77,5 +77,6 @@ with col2:
     if st.button("Predict Pipeline Risk"):
         pred = water_model.predict([[pressure,flow,temp]])
         st.success("High Risk" if pred[0]==1 else "Low Risk")
+
 
 
