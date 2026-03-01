@@ -37,15 +37,33 @@ def load_data():
 
     bridge = bridge.dropna()
 
-    # ---------- WATER SUPER SAFE FIX ----------
-    # convert EVERYTHING possible to numeric
-    for col in water.columns:
-        if col not in ["failure", "infrastructure_type"]:
-            water[col] = pd.to_numeric(water[col], errors="coerce")
+    # -------- WATER DATA SAFE FIX --------
 
-    # drop rows containing bad values
-    water = water.dropna()
+water = pd.read_csv("water.csv")
 
+# clean column names
+water.columns = water.columns.str.strip()
+
+# remove empty rows
+water = water.dropna()
+
+# convert all columns except target to numbers
+for col in water.columns:
+    if col not in ["failure", "infrastructure_type"]:
+        water[col] = pd.to_numeric(water[col], errors="coerce")
+
+# remove rows that became NaN after conversion
+water = water.dropna()
+
+# X and y
+X_water = water.drop(["failure", "infrastructure_type"], axis=1)
+y_water = water["failure"]
+
+# final safety check
+X_water = X_water.astype(float)
+
+water_model = RandomForestClassifier()
+water_model.fit(X_water, y_water)
     return bridge, water
 
 
@@ -111,5 +129,6 @@ with col2:
             st.error("⚠️ High Risk")
         else:
             st.success("✅ Low Risk")
+
 
 
