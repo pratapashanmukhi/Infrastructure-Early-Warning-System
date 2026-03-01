@@ -64,7 +64,7 @@ X_water = X_water.astype(float)
 
 water_model = RandomForestClassifier()
 water_model.fit(X_water, y_water)
-    return bridge, water
+return bridge, water
 
 
 bridge, water = load_data()
@@ -129,6 +129,7 @@ with col2:
             st.error("⚠️ High Risk")
         else:
             st.success("✅ Low Risk")
+
 
 
 
