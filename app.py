@@ -137,3 +137,4 @@ else:
             st.error("⚠️ High Pipeline Failure Risk")
         else:
             st.success("✅ Low Pipeline Failure Risk")
+
