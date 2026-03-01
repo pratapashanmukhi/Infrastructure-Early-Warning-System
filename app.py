@@ -61,7 +61,7 @@ bridge_model = RandomForestClassifier()
 bridge_model.fit(X_bridge, y_bridge)
 
 # Water model
-X_water = water.drop(["failure", "infrastructure_type"], axis=1)
+X_water = water.drop(["failure", "infrastructure_type","Sensor_ID], axis=1)
 y_water = water["failure"]
 
 water_model = RandomForestClassifier()
@@ -111,3 +111,4 @@ with col2:
             st.error("⚠️ High Risk")
         else:
             st.success("✅ Low Risk")
+
