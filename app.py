@@ -31,25 +31,26 @@ bridge_model = RandomForestClassifier()
 bridge_model.fit(X_bridge, y_bridge)
 
 # ---------- WATER DATA SAFE VERSION ----------
-water = pd.read_csv("water.csv")
-water.columns = water.columns.str.strip()
+#water = pd.read_csv("water.csv")
+#water.columns = water.columns.str.strip()
 
 # remove completely empty columns
-water = water.dropna(axis=1, how="all")
+#water = water.dropna(axis=1, how="all")
 
 # keep only numeric columns + target
-for col in water.columns:
-    if col not in ["failure", "infrastructure_type"]:
+#for col in water.columns:
+  #  if col not in ["failure", "infrastructure_type"]:
         water[col] = pd.to_numeric(water[col], errors="coerce")
 
-water = water.dropna()
+#water = water.dropna()
 
 # IMPORTANT: automatically select numeric features only
-X_water = water.select_dtypes(include=["number"]).drop("failure", axis=1)
-y_water = water["failure"]
+#X_water = water.select_dtypes(include=["number"]).drop("failure", axis=1)
+#y_water = water["failure"]
 
-water_model = RandomForestClassifier()
-water_model.fit(X_water, y_water)
+#water_model = RandomForestClassifier()
+#water_model.fit(X_water, y_water)
+water_model = None
 
 # ---------- UI ----------
 col1, col2 = st.columns(2)
@@ -76,4 +77,5 @@ with col2:
     if st.button("Predict Pipeline Risk"):
         pred = water_model.predict([[pressure,flow,temp]])
         st.success("High Risk" if pred[0]==1 else "Low Risk")
+
 
