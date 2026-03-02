@@ -75,8 +75,18 @@ with col2:
     temp = st.slider("Temperature",0,50,25)
 
     if st.button("Predict Pipeline Risk"):
-        pred = water_model.predict([[pressure,flow,temp]])
-        st.success("High Risk" if pred[0]==1 else "Low Risk")
+
+    if water_model is None:
+        st.warning("Water model not loaded yet. Add clean water.csv later.")
+    else:
+        pred = water_model.predict([[pressure, flow, temp]])
+
+        if pred[0] == 1:
+            st.error("⚠️ High Failure Risk")
+        else:
+            st.success("✅ Low Failure Risk")
+   
+
 
 
 
