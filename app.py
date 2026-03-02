@@ -11,7 +11,6 @@ st.write("Predict failure risks in bridges and water pipelines using Machine Lea
 bridge = pd.read_csv("bridge.csv")
 bridge.columns = bridge.columns.str.strip()
 
-# encode safely
 if "Material_Type" in bridge.columns:
     bridge["Material_Type"] = bridge["Material_Type"].map({"Concrete":0,"Steel":1})
 
@@ -30,33 +29,16 @@ y_bridge = bridge["failure"]
 bridge_model = RandomForestClassifier()
 bridge_model.fit(X_bridge, y_bridge)
 
-# ---------- WATER DATA SAFE VERSION ----------
-#water = pd.read_csv("water.csv")
-#water.columns = water.columns.str.strip()
-
-# remove completely empty columns
-#water = water.dropna(axis=1, how="all")
-
-# keep only numeric columns + target
-#for col in water.columns:
-  #  if col not in ["failure", "infrastructure_type"]:
-      #  water[col] = pd.to_numeric(water[col], errors="coerce")
-
-#water = water.dropna()
-
-# IMPORTANT: automatically select numeric features only
-#X_water = water.select_dtypes(include=["number"]).drop("failure", axis=1)
-#y_water = water["failure"]
-
-#water_model = RandomForestClassifier()
-#water_model.fit(X_water, y_water)
+# ---------- WATER MODEL (DISABLED FOR NOW) ----------
 water_model = None
 
 # ---------- UI ----------
 col1, col2 = st.columns(2)
 
+# ----- BRIDGE -----
 with col1:
     st.subheader("Bridge Failure Prediction")
+
     age = st.slider("Bridge Age",10,100,50)
     traffic = st.slider("Traffic Volume",100,5000,2000)
     material = st.selectbox("Material",["Concrete","Steel"])
@@ -65,28 +47,32 @@ with col1:
     if st.button("Predict Bridge Risk"):
         mat = 0 if material=="Concrete" else 1
         m = {"No-Maintenance":0,"Bi-Annual":1,"Annual":2}[maint]
-        pred = bridge_model.predict([[age,traffic,mat,m]])
-        st.success("High Risk" if pred[0]==1 else "Low Risk")
 
+        pred = bridge_model.predict([[age,traffic,mat,m]])
+
+        if pred[0]==1:
+            st.error("⚠️ High Risk")
+        else:
+            st.success("✅ Low Risk")
+
+# ----- WATER -----
 with col2:
     st.subheader("Water Pipeline Prediction")
+
     pressure = st.slider("Pressure",1,20,8)
     flow = st.slider("Flow Rate",10,200,80)
     temp = st.slider("Temperature",0,50,25)
 
     if st.button("Predict Pipeline Risk"):
 
-    if water_model is None:
-        st.warning("Water model not loaded yet. Add clean water.csv later.")
-    else:
-        pred = water_model.predict([[pressure, flow, temp]])
-
-        if pred[0] == 1:
-            st.error("⚠️ High Failure Risk")
+        if water_model is None:
+            st.warning("Water model not loaded yet.")
         else:
-            st.success("✅ Low Failure Risk")
-   
+            pred = water_model.predict([[pressure, flow, temp]])
 
-
+            if pred[0] == 1:
+                st.error("⚠️ High Failure Risk")
+            else:
+                st.success("✅ Low Failure Risk")
 
 
